@@ -1,117 +1,38 @@
-import React from "react";
-import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import ClienteForm from "./ClienteForm";
 import AdminGate from "./AdminGate";
-
-function Header() {
-  const location = useLocation();
-
-  return (
-    <div style={styles.headerWrap}>
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>🚌 Transporte Colegial</h1>
-          <p style={styles.subtitle}>
-            Contratación del servicio y gestión administrativa
-          </p>
-        </div>
-
-        <div style={styles.nav}>
-          <Link
-            to="/"
-            style={{
-              ...styles.navBtn,
-              ...(location.pathname === "/" ? styles.navBtnActive : {}),
-            }}
-          >
-            Portal Cliente
-          </Link>
-
-          <Link
-            to="/admin"
-            style={{
-              ...styles.navBtn,
-              ...(location.pathname.startsWith("/admin")
-                ? styles.navBtnActive
-                : {}),
-            }}
-          >
-            Admin
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+import AdminPanel from "./AdminPanel";
 
 export default function App() {
   return (
-    <div style={styles.appBg}>
-      <Header />
-      <div style={styles.page}>
+    <BrowserRouter>
+      <div style={{ minHeight: "100vh", background: "#f5f7fb" }}>
         <Routes>
           <Route path="/" element={<ClienteForm />} />
-          <Route path="/admin" element={<AdminGate />} />
+          <Route path="/admin" element={<AdminGate><AdminPanel /></AdminGate>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
+        {/* Botón flotante opcional para entrar al admin */}
+        <Link
+          to="/admin"
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 16,
+            background: "#0f172a",
+            color: "#fff",
+            padding: "10px 14px",
+            borderRadius: 999,
+            textDecoration: "none",
+            fontWeight: 700,
+            fontSize: 14,
+            boxShadow: "0 6px 18px rgba(0,0,0,.2)"
+          }}
+        >
+          Admin
+        </Link>
       </div>
-    </div>
+    </BrowserRouter>
   );
 }
-
-const styles = {
-  appBg: {
-    minHeight: "100vh",
-    background: "#f3f4f6",
-    fontFamily: "Arial, sans-serif",
-  },
-  headerWrap: {
-    background: "#ffffff",
-    borderBottom: "1px solid #e5e7eb",
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-  },
-  header: {
-    maxWidth: "1200px",
-    margin: "0 auto",
-    padding: "16px 20px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    flexWrap: "wrap",
-  },
-  title: {
-    margin: 0,
-    fontSize: "28px",
-    color: "#111827",
-  },
-  subtitle: {
-    margin: "6px 0 0",
-    color: "#6b7280",
-    fontSize: "14px",
-  },
-  nav: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-  navBtn: {
-    textDecoration: "none",
-    background: "#e5e7eb",
-    color: "#111827",
-    padding: "10px 14px",
-    borderRadius: "10px",
-    fontWeight: 700,
-    fontSize: "14px",
-  },
-  navBtnActive: {
-    background: "#111827",
-    color: "#ffffff",
-  },
-  page: {
-    maxWidth: "1200px",
-    margin: "0 auto",
-    padding: "20px",
-  },
-};

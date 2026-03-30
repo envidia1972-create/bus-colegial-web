@@ -1,185 +1,296 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 
+/**
+ * ⚠️ IMPORTANTE:
+ * Ajusta estas rutas, buses y precios a tus valores reales
+ * - precioAnual = precio base para servicio COMPLETO
+ * - Si elige solo recoger o solo llevar => precioAnual - 100
+ */
 const RUTAS = [
-  { id: 1, codigo: "RUTA-1", nombre: "Villa Lucre", bus: "Bus 01", precio: 850 },
-  { id: 2, codigo: "RUTA-2", nombre: "Brisas del Golf", bus: "Bus 02", precio: 920 },
-  { id: 3, codigo: "RUTA-3", nombre: "San Antonio", bus: "Bus 03", precio: 980 },
-  { id: 4, codigo: "RUTA-4", nombre: "Cerro Viento", bus: "Bus 04", precio: 890 },
-  { id: 5, codigo: "RUTA-5", nombre: "Juan Díaz", bus: "Bus 05", precio: 1050 },
+  { codigo: "RUTA-1", nombre: "Ruta 1 - Bella Vista", bus: "BUS-01", precioAnual: 1200 },
+  { codigo: "RUTA-2", nombre: "Ruta 2 - El Cangrejo", bus: "BUS-02", precioAnual: 1300 },
+  { codigo: "RUTA-3", nombre: "Ruta 3 - Vía España", bus: "BUS-03", precioAnual: 1400 },
+  { codigo: "RUTA-4", nombre: "Ruta 4 - Tumba Muerto", bus: "BUS-04", precioAnual: 1500 }
 ];
 
-const initialForm = {
-  acudiente_nombre: "",
-  acudiente_cedula: "",
-  telefono: "",
-  email: "",
-  estudiante_nombre: "",
-  estudiante_cedula: "",
-  grado: "",
-  barriada: "",
-  calle: "",
-  casa: "",
-  ruta_id: "",
-  comentarios: "",
-};
+const TIPOS_SERVICIO = [
+  { value: "Completo", label: "Completo (ida y vuelta)" },
+  { value: "Solo recoger en casa", label: "Solo recoger en casa" },
+  { value: "Solo llevar a casa", label: "Solo llevar a casa" }
+];
 
 export default function ClienteForm() {
-  const [form, setForm] = useState(initialForm);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [form, setForm] = useState({
+    acudiente_nombre: "",
+    acudiente_cedula: "",
+    telefono: "",
+    email: "",
+    estudiante_nombre: "",
+    grado: "",
+    direccion: "",
+    ruta_id: "",
+    tipo_servicio: "Completo"
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [mensaje, setMensaje] = useState("");
   const [error, setError] = useState("");
+  const [ultimoCupo, setUltimoCupo] = useState("");
 
-  const rutaSeleccionada = useMemo(() => {
-    return RUTAS.find((r) => String(r.id) === String(form.ruta_id)) || null;
-  }, [form.ruta_id]);
+  const rutaSeleccionada = useMemo(
+    () => RUTAS.find((r) => r.codigo === form.ruta_id),
+    [form.ruta_id]
+  );
 
-  const precioAnual = rutaSeleccionada?.precio || 0;
-  const cuota10 = precioAnual ? (precioAnual / 10).toFixed(2) : "0.00";
-  const busAsignado = rutaSeleccionada?.bus || "";
+  const precioCalculado = useMemo(() => {
+    if (!rutaSeleccionada) return 0;
+
+    let precio = Number(rutaSeleccionada.precioAnual) || 0;
+
+    if (
+      form.tipo_servicio === "Solo recoger en casa" ||
+      form.tipo_servicio === "Solo llevar a casa"
+    ) {
+      precio = Math.max(0, precio - 100);
+    }
+
+    return precio;
+  }, [rutaSeleccionada, form.tipo_servicio]);
+
+  const cuotaMensual = useMemo(() => {
+    return precioCalculado > 0 ? (precioCalculado / 10).toFixed(2) : "0.00";
+  }, [precioCalculado]);
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((old) => ({ ...old, [name]: value }));
   };
 
-  const guardar = async (e) => {
+  const generarNumeroCupo = async () => {
+    const year = new Date().getFullYear();
+
+    const { count, error } = await supabase
+      .from("solicitudes_bus")
+      .select("*", { count: "exact", head: true });
+
+    if (error) throw error;
+
+    const siguiente = (count || 0) + 1;
+    return `CUP-${year}-${String(siguiente).padStart(4, "0")}`;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    setMsg("");
+    setLoading(true);
+    setMensaje("");
     setError("");
+    setUltimoCupo("");
 
     try {
-      if (!form.email.trim()) {
-        throw new Error("El correo es obligatorio");
+      if (!rutaSeleccionada) {
+        throw new Error("Debe seleccionar una ruta.");
       }
 
-      if (!form.ruta_id) {
-        throw new Error("Debes seleccionar una ruta");
-      }
+      const numeroCupo = await generarNumeroCupo();
 
       const payload = {
+        // Mantén estas columnas alineadas con tu tabla REAL
         acudiente_nombre: form.acudiente_nombre,
         acudiente_cedula: form.acudiente_cedula,
         telefono: form.telefono,
         email: form.email,
         estudiante_nombre: form.estudiante_nombre,
-        estudiante_cedula: form.estudiante_cedula,
         grado: form.grado,
-        barriada: form.barriada,
-        calle: form.calle,
-        casa: form.casa,
-        ruta_id: Number(form.ruta_id), // importante: entero
-        ruta_codigo: rutaSeleccionada?.codigo || null,
-        ruta_nombre: rutaSeleccionada?.nombre || null,
-        bus_asignado: busAsignado || null,
-        precio_anual: precioAnual,
-        cuota_10_meses: Number(cuota10),
+        direccion: form.direccion,
+
+        // OJO: Si tu columna ruta es INTEGER, NO uses "RUTA-1"
+        // Si tu tabla espera texto, deja form.ruta_id
+        // Si antes te dio error con "RUTA-1", probablemente tu columna ruta es numérica.
+        // En ese caso, guarda solo el número:
+        ruta_id: parseInt(form.ruta_id.replace("RUTA-", ""), 10),
+
+        bus_asignado: rutaSeleccionada.bus,
+        precio_anual: precioCalculado,
+        cuota_mensual: Number(cuotaMensual),
         estado: "pendiente",
-        comentarios: form.comentarios || null,
+
+        // NUEVAS COLUMNAS
+        numero_cupo: numeroCupo,
+        tipo_servicio: form.tipo_servicio
       };
 
-      const { error } = await supabase.from("solicitudes_bus").insert([payload]);
+      const { error: insertError } = await supabase
+        .from("solicitudes_bus")
+        .insert([payload]);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      setMsg("✅ Solicitud enviada correctamente");
-      setForm(initialForm);
+      setUltimoCupo(numeroCupo);
+      setMensaje("Solicitud enviada correctamente.");
+
+      setForm({
+        acudiente_nombre: "",
+        acudiente_cedula: "",
+        telefono: "",
+        email: "",
+        estudiante_nombre: "",
+        grado: "",
+        direccion: "",
+        ruta_id: "",
+        tipo_servicio: "Completo"
+      });
     } catch (err) {
-      setError("Error al guardar: " + err.message);
+      setError(err.message || "Error al guardar la solicitud");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div style={styles.wrap}>
+    <div style={styles.page}>
       <div style={styles.card}>
-        <h2 style={styles.title}>🚌 Solicitud de Transporte Colegial</h2>
-        <p style={styles.subtitle}>
-          Complete los datos del acudiente y del estudiante.
-        </p>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Contratación de Transporte Colegial</h1>
+          <p style={styles.subtitle}>
+            Complete el formulario para solicitar su cupo de transporte escolar
+          </p>
+        </div>
 
-        <form onSubmit={guardar}>
-          <Section title="Datos del Acudiente" />
-          <div style={styles.grid2}>
-            <Input label="Nombre del acudiente" name="acudiente_nombre" value={form.acudiente_nombre} onChange={onChange} required />
-            <Input label="Cédula del acudiente" name="acudiente_cedula" value={form.acudiente_cedula} onChange={onChange} />
-            <Input label="Teléfono" name="telefono" value={form.telefono} onChange={onChange} required />
-            <Input label="Correo electrónico" name="email" type="email" value={form.email} onChange={onChange} required />
-          </div>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <SectionTitle text="Datos del Acudiente" />
 
-          <Section title="Datos del Estudiante" />
-          <div style={styles.grid2}>
-            <Input label="Nombre del estudiante" name="estudiante_nombre" value={form.estudiante_nombre} onChange={onChange} required />
-            <Input label="Cédula del estudiante" name="estudiante_cedula" value={form.estudiante_cedula} onChange={onChange} />
-            <Input label="Grado" name="grado" value={form.grado} onChange={onChange} required />
-          </div>
+          <Input
+            label="Nombre del acudiente"
+            name="acudiente_nombre"
+            value={form.acudiente_nombre}
+            onChange={onChange}
+            required
+          />
 
-          <Section title="Dirección" />
-          <div style={styles.grid3}>
-            <Input label="Barriada" name="barriada" value={form.barriada} onChange={onChange} required />
-            <Input label="Calle" name="calle" value={form.calle} onChange={onChange} required />
-            <Input label="Casa" name="casa" value={form.casa} onChange={onChange} required />
-          </div>
+          <Input
+            label="Cédula del acudiente"
+            name="acudiente_cedula"
+            value={form.acudiente_cedula}
+            onChange={onChange}
+          />
 
-          <Section title="Ruta y Asignación Automática" />
-          <div style={styles.grid2}>
-            <div>
-              <label style={styles.label}>Seleccione la ruta</label>
-              <select
-                name="ruta_id"
-                value={form.ruta_id}
-                onChange={onChange}
-                style={styles.input}
-                required
-              >
-                <option value="">-- Seleccione una ruta --</option>
-                {RUTAS.map((ruta) => (
-                  <option key={ruta.id} value={ruta.id}>
-                    {ruta.codigo} - {ruta.nombre}
-                  </option>
-                ))}
-              </select>
+          <Input
+            label="Teléfono"
+            name="telefono"
+            value={form.telefono}
+            onChange={onChange}
+            required
+          />
+
+          <Input
+            label="Correo electrónico"
+            name="email"
+            type="email"
+            value={form.email}
+            onChange={onChange}
+            required
+          />
+
+          <SectionTitle text="Datos del Estudiante" />
+
+          <Input
+            label="Nombre del estudiante"
+            name="estudiante_nombre"
+            value={form.estudiante_nombre}
+            onChange={onChange}
+            required
+          />
+
+          <Input
+            label="Grado"
+            name="grado"
+            value={form.grado}
+            onChange={onChange}
+          />
+
+          <Input
+            label="Dirección de residencia"
+            name="direccion"
+            value={form.direccion}
+            onChange={onChange}
+            required
+          />
+
+          <SectionTitle text="Ruta y Tipo de Servicio" />
+
+          <label style={styles.label}>Ruta</label>
+          <select
+            name="ruta_id"
+            value={form.ruta_id}
+            onChange={onChange}
+            style={styles.input}
+            required
+          >
+            <option value="">Seleccione una ruta</option>
+            {RUTAS.map((ruta_id) => (
+              <option key={ruta_id.codigo} value={ruta_id.codigo}>
+                {ruta_id.nombre} — {ruta_id.bus} — ${ruta_id.precioAnual}/año
+              </option>
+            ))}
+          </select>
+
+          <label style={styles.label}>Tipo de servicio</label>
+          <select
+            name="tipo_servicio"
+            value={form.tipo_servicio}
+            onChange={onChange}
+            style={styles.input}
+            required
+          >
+            {TIPOS_SERVICIO.map((tipo) => (
+              <option key={tipo.value} value={tipo.value}>
+                {tipo.label}
+              </option>
+            ))}
+          </select>
+
+          {rutaSeleccionada && (
+            <div style={styles.resumen}>
+              <h3 style={{ marginTop: 0, color: "#0f172a" }}>Resumen de asignación</h3>
+
+              <div style={styles.resumenGrid}>
+                <ResumenItem label="Ruta" value={rutaSeleccionada.nombre} />
+                <ResumenItem label="Bus asignado" value={rutaSeleccionada.bus} />
+                <ResumenItem label="Tipo de servicio" value={form.tipo_servicio} />
+                <ResumenItem label="Precio anual" value={`$${precioCalculado}`} />
+                <ResumenItem label="10 cuotas" value={`$${cuotaMensual}`} />
+              </div>
+
+              {(form.tipo_servicio === "Solo recoger en casa" ||
+                form.tipo_servicio === "Solo llevar a casa") && (
+                <p style={{ color: "#166534", marginTop: 12, fontWeight: 600 }}>
+                  ✅ Se aplicó descuento de $100 por servicio parcial
+                </p>
+              )}
             </div>
+          )}
 
-            <div>
-              <label style={styles.label}>Bus asignado automáticamente</label>
-              <input
-                value={busAsignado}
-                readOnly
-                style={{ ...styles.input, background: "#f9fafb" }}
-              />
+          {mensaje && (
+            <div style={styles.successBox}>
+              <strong>✅ {mensaje}</strong>
+              {ultimoCupo && (
+                <div style={{ marginTop: 8 }}>
+                  <div><strong>Número de seguimiento / cupo:</strong></div>
+                  <div style={styles.cupo}>{ultimoCupo}</div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          <div style={styles.priceBox}>
-            <div style={styles.priceItem}>
-              <span style={styles.priceLabel}>Precio anual</span>
-              <strong>B/. {precioAnual.toFixed(2)}</strong>
+          {error && (
+            <div style={styles.errorBox}>
+              <strong>❌ {error}</strong>
             </div>
-            <div style={styles.priceItem}>
-              <span style={styles.priceLabel}>Prorrateado en 10 cuotas</span>
-              <strong>B/. {cuota10}</strong>
-            </div>
-          </div>
+          )}
 
-          <div style={{ marginTop: "16px" }}>
-            <label style={styles.label}>Comentarios (opcional)</label>
-            <textarea
-              name="comentarios"
-              value={form.comentarios}
-              onChange={onChange}
-              rows={4}
-              style={styles.textarea}
-            />
-          </div>
-
-          {msg && <div style={styles.ok}>{msg}</div>}
-          {error && <div style={styles.err}>{error}</div>}
-
-          <button type="submit" disabled={saving} style={styles.btn}>
-            {saving ? "Guardando..." : "Enviar Solicitud"}
+          <button type="submit" disabled={loading} style={styles.button}>
+            {loading ? "Enviando..." : "Enviar Solicitud"}
           </button>
         </form>
       </div>
@@ -187,120 +298,140 @@ export default function ClienteForm() {
   );
 }
 
-function Section({ title }) {
-  return <h3 style={styles.section}>{title}</h3>;
+function SectionTitle({ text }) {
+  return <h2 style={styles.sectionTitle}>{text}</h2>;
 }
 
 function Input({ label, ...props }) {
   return (
-    <div>
+    <>
       <label style={styles.label}>{label}</label>
       <input {...props} style={styles.input} />
+    </>
+  );
+}
+
+function ResumenItem({ label, value }) {
+  return (
+    <div style={styles.resumenItem}>
+      <div style={styles.resumenLabel}>{label}</div>
+      <div style={styles.resumenValue}>{value}</div>
     </div>
   );
 }
 
 const styles = {
-  wrap: {
-    display: "flex",
-    justifyContent: "center",
+  page: {
+    minHeight: "100vh",
+    padding: "20px 14px 80px"
   },
   card: {
     width: "100%",
+    maxWidth: 860,
+    margin: "0 auto",
     background: "#fff",
-    borderRadius: "20px",
-    padding: "24px",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    borderRadius: 22,
+    padding: 24,
+    boxShadow: "0 12px 35px rgba(15,23,42,.08)"
+  },
+  header: {
+    marginBottom: 16
   },
   title: {
-    marginTop: 0,
-    color: "#111827",
+    margin: 0,
+    color: "#0f172a",
+    fontSize: 30
   },
   subtitle: {
-    color: "#6b7280",
-    marginBottom: "18px",
+    color: "#475569",
+    marginTop: 8
   },
-  section: {
-    marginTop: "22px",
-    marginBottom: "12px",
-    color: "#111827",
-    borderBottom: "1px solid #e5e7eb",
-    paddingBottom: "8px",
-  },
-  grid2: {
+  form: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "14px",
+    gap: 10
   },
-  grid3: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "14px",
+  sectionTitle: {
+    marginTop: 14,
+    marginBottom: 4,
+    color: "#1e3a8a",
+    fontSize: 20
   },
   label: {
-    display: "block",
-    marginBottom: "6px",
-    fontWeight: 600,
-    color: "#374151",
-    fontSize: "14px",
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#334155"
   },
   input: {
     width: "100%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    boxSizing: "border-box",
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    fontSize: 16,
+    outline: "none",
+    boxSizing: "border-box"
   },
-  textarea: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    boxSizing: "border-box",
-    resize: "vertical",
+  resumen: {
+    marginTop: 10,
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    borderRadius: 16,
+    padding: 16
   },
-  priceBox: {
-    marginTop: "16px",
-    background: "#f9fafb",
-    border: "1px solid #e5e7eb",
-    borderRadius: "14px",
-    padding: "16px",
+  resumenGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "12px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 12
   },
-  priceItem: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
+  resumenItem: {
+    background: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    border: "1px solid #dbeafe"
   },
-  priceLabel: {
-    color: "#6b7280",
-    fontSize: "14px",
+  resumenLabel: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: 700
   },
-  ok: {
-    marginTop: "16px",
-    background: "#dcfce7",
+  resumenValue: {
+    fontSize: 16,
+    color: "#0f172a",
+    fontWeight: 800,
+    marginTop: 4
+  },
+  successBox: {
+    marginTop: 10,
+    background: "#ecfdf5",
+    border: "1px solid #86efac",
     color: "#166534",
-    padding: "12px",
-    borderRadius: "10px",
+    padding: 14,
+    borderRadius: 14
   },
-  err: {
-    marginTop: "16px",
-    background: "#fee2e2",
+  errorBox: {
+    marginTop: 10,
+    background: "#fef2f2",
+    border: "1px solid #fca5a5",
     color: "#991b1b",
-    padding: "12px",
-    borderRadius: "10px",
+    padding: 14,
+    borderRadius: 14
   },
-  btn: {
-    marginTop: "18px",
+  cupo: {
+    marginTop: 6,
+    fontSize: 22,
+    fontWeight: 900,
+    letterSpacing: 1,
+    color: "#065f46"
+  },
+  button: {
+    marginTop: 8,
     width: "100%",
-    background: "#111827",
-    color: "#fff",
+    padding: 14,
+    borderRadius: 14,
     border: "none",
-    padding: "14px",
-    borderRadius: "12px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
+    background: "#2563eb",
+    color: "#fff",
+    fontWeight: 800,
+    fontSize: 16,
+    cursor: "pointer"
+  }
 };

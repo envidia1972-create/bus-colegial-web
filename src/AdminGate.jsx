@@ -1,134 +1,130 @@
-import React, { useEffect, useState } from "react";
-import AdminPanel from "./AdminPanel";
+import { useState } from "react";
 
-export default function AdminGate() {
-  const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASS || "admin2026";
-  const [allowed, setAllowed] = useState(false);
+export default function AdminGate({ children }) {
+  const [ok, setOk] = useState(sessionStorage.getItem("admin_ok") === "1");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const saved = localStorage.getItem("bus_admin_ok");
-    if (saved === "yes") setAllowed(true);
-  }, []);
+  const ADMIN_PASSWORD = "1234"; // 👈 cámbiala luego
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (password === ADMIN_PASS) {
-      localStorage.setItem("bus_admin_ok", "yes");
-      setAllowed(true);
+
+    if (password === ADMIN_PASSWORD) {
+      sessionStorage.setItem("admin_ok", "1");
+      setOk(true);
       setError("");
     } else {
-      setError("Clave incorrecta");
+      setError("Contraseña incorrecta");
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("bus_admin_ok");
-    setAllowed(false);
+  const logout = () => {
+    sessionStorage.removeItem("admin_ok");
+    setOk(false);
     setPassword("");
   };
 
-  if (allowed) {
+  if (!ok) {
     return (
-      <div>
-        <div style={styles.topBar}>
-          <button onClick={handleLogout} style={styles.logoutBtn}>
-            Cerrar sesión Admin
-          </button>
+      <div style={styles.wrap}>
+        <div style={styles.card}>
+          <h2 style={styles.title}>Acceso Administrador</h2>
+          <p style={styles.subtitle}>Ingrese la contraseña para acceder al panel</p>
+
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={styles.input}
+            />
+
+            {error && <p style={{ color: "#dc2626", marginTop: 8 }}>{error}</p>}
+
+            <button type="submit" style={styles.button}>
+              Entrar
+            </button>
+          </form>
         </div>
-        <AdminPanel />
       </div>
     );
   }
 
   return (
-    <div style={styles.wrap}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>🔐 Acceso Administrativo</h2>
-        <p style={styles.subtitle}>
-          Ingresa la clave para abrir el panel de administración.
-        </p>
-
-        <form onSubmit={handleLogin}>
-          <input
-            type="password"
-            placeholder="Escribe la clave"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-          />
-          {error && <div style={styles.error}>{error}</div>}
-          <button type="submit" style={styles.btn}>
-            Entrar al Admin
-          </button>
-        </form>
+    <div>
+      <div style={styles.topbar}>
+        <span style={{ fontWeight: 700 }}>Panel Admin</span>
+        <button onClick={logout} style={styles.logoutBtn}>
+          Cerrar sesión
+        </button>
       </div>
+      {children}
     </div>
   );
 }
 
 const styles = {
   wrap: {
+    minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
-    padding: "40px 20px",
+    alignItems: "center",
+    padding: 20
   },
   card: {
     width: "100%",
-    maxWidth: "450px",
+    maxWidth: 420,
     background: "#fff",
-    borderRadius: "18px",
-    padding: "24px",
-    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    borderRadius: 18,
+    padding: 24,
+    boxShadow: "0 10px 30px rgba(0,0,0,.08)"
   },
   title: {
     margin: 0,
-    color: "#111827",
+    color: "#0f172a"
   },
   subtitle: {
-    color: "#6b7280",
-    marginTop: "8px",
-    marginBottom: "18px",
+    color: "#475569",
+    marginTop: 8,
+    marginBottom: 16
   },
   input: {
     width: "100%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    marginBottom: "12px",
-    boxSizing: "border-box",
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    outline: "none",
+    fontSize: 16,
+    boxSizing: "border-box"
   },
-  btn: {
+  button: {
     width: "100%",
-    background: "#111827",
-    color: "#fff",
+    marginTop: 14,
+    padding: 12,
     border: "none",
-    padding: "12px",
-    borderRadius: "10px",
+    borderRadius: 12,
+    background: "#2563eb",
+    color: "#fff",
     fontWeight: 700,
-    cursor: "pointer",
+    cursor: "pointer"
   },
-  error: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    padding: "10px",
-    borderRadius: "10px",
-    marginBottom: "12px",
-    fontSize: "14px",
-  },
-  topBar: {
+  topbar: {
     display: "flex",
-    justifyContent: "flex-end",
-    marginBottom: "12px",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "14px 18px",
+    background: "#0f172a",
+    color: "#fff"
   },
   logoutBtn: {
-    background: "#dc2626",
-    color: "#fff",
     border: "none",
-    padding: "10px 14px",
-    borderRadius: "10px",
+    background: "#ef4444",
+    color: "#fff",
+    borderRadius: 10,
+    padding: "8px 12px",
     cursor: "pointer",
-    fontWeight: 700,
-  },
+    fontWeight: 700
+  }
 };

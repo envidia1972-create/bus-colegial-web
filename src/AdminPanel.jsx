@@ -1,166 +1,98 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = "https://jfcadzabfmijelrmmfvn.supabase.co";
-const supabaseAnonKey = "sb_publishable_jnWNEBKugsO1MRX6tKpDrA_L8uXoxAV";
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-const ESTADOS = [
-  "todos",
-  "pendiente",
-  "preinscrito",
-  "aprobado",
-  "activo",
-  "rechazado",
-];
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "./lib/supabase";
 
 export default function AdminPanel() {
-  const [solicitudes, setSolicitudes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [buscando, setBuscando] = useState("");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [actualizandoId, setActualizandoId] = useState(null);
-  const [error, setError] = useState("");
+
+  const cargarSolicitudes = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("solicitudes_bus")
+        .select("*")
+        .order("id", { ascending: false });
+
+      if (error) throw error;
+
+      setData(data || []);
+    } catch (err) {
+      setError(err.message || "Error al cargar solicitudes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     cargarSolicitudes();
   }, []);
 
-  async function cargarSolicitudes() {
-    setLoading(true);
-    setError("");
+  const actualizarEstado = async (id, nuevoEstado) => {
+    try {
+      setActualizandoId(id);
 
-    const { data, error } = await supabase
-      .from("solicitudes_bus")
-      .select("*")
-      .order("created_at", { ascending: false });
+      const payload = { estado: nuevoEstado };
 
-    if (error) {
-      console.error("Error cargando solicitudes:", error);
-      setError(error.message);
-      setSolicitudes([]);
-    } else {
-      setSolicitudes(data || []);
+      const { error } = await supabase
+        .from("solicitudes_bus")
+        .update(payload)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await cargarSolicitudes();
+    } catch (err) {
+      alert(err.message || "Error actualizando estado");
+    } finally {
+      setActualizandoId(null);
     }
+  };
 
-    setLoading(false);
-  }
-
-  async function cambiarEstado(id, nuevoEstado) {
-    setActualizandoId(id);
-    setError("");
-
-    const { error } = await supabase
-      .from("solicitudes_bus")
-      .update({ estado: nuevoEstado })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Error actualizando estado:", error);
-      setError(error.message);
-    } else {
-      setSolicitudes((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, estado: nuevoEstado } : item
-        )
-      );
-    }
-
-    setActualizandoId(null);
-  }
-
-  const solicitudesFiltradas = useMemo(() => {
-    return solicitudes.filter((item) => {
-      const texto = buscando.toLowerCase();
+  const filtradas = useMemo(() => {
+    return data.filter((item) => {
+      const texto = busqueda.toLowerCase();
 
       const coincideTexto =
-        (item.nombre_estudiante || "").toLowerCase().includes(texto) ||
-        (item.nombre_acudiente || "").toLowerCase().includes(texto) ||
-        (item.telefono || "").toLowerCase().includes(texto) ||
-        (item.ruta_nombre || "").toLowerCase().includes(texto) ||
-        (item.bus_asignado || "").toLowerCase().includes(texto);
+        !texto ||
+        String(item.estudiante_nombre || "").toLowerCase().includes(texto) ||
+        String(item.acudiente_nombre || "").toLowerCase().includes(texto) ||
+        String(item.numero_cupo || "").toLowerCase().includes(texto) ||
+        String(item.email || "").toLowerCase().includes(texto);
 
       const coincideEstado =
-        filtroEstado === "todos" ? true : item.estado === filtroEstado;
+        filtroEstado === "todos" ||
+        String(item.estado || "").toLowerCase() === filtroEstado.toLowerCase();
 
       return coincideTexto && coincideEstado;
     });
-  }, [solicitudes, buscando, filtroEstado]);
-
-  const resumen = useMemo(() => {
-    return {
-      total: solicitudes.length,
-      pendiente: solicitudes.filter((s) => s.estado === "pendiente").length,
-      preinscrito: solicitudes.filter((s) => s.estado === "preinscrito").length,
-      aprobado: solicitudes.filter((s) => s.estado === "aprobado").length,
-      activo: solicitudes.filter((s) => s.estado === "activo").length,
-      rechazado: solicitudes.filter((s) => s.estado === "rechazado").length,
-    };
-  }, [solicitudes]);
-
-  function formatearDinero(valor) {
-    if (valor === null || valor === undefined || valor === "") return "-";
-    return Number(valor).toLocaleString("es-PA", {
-      style: "currency",
-      currency: "USD",
-    });
-  }
-
-  function formatearFecha(fecha) {
-    if (!fecha) return "-";
-    return new Date(fecha).toLocaleString("es-PA");
-  }
-
-  function colorEstado(estado) {
-    switch (estado) {
-      case "pendiente":
-        return "#f59e0b";
-      case "preinscrito":
-        return "#3b82f6";
-      case "aprobado":
-        return "#10b981";
-      case "activo":
-        return "#059669";
-      case "rechazado":
-        return "#ef4444";
-      default:
-        return "#6b7280";
-    }
-  }
+  }, [data, busqueda, filtroEstado]);
 
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <header style={styles.header}>
+        <div style={styles.header}>
           <div>
-            <h1 style={styles.title}>🚍 Panel Admin - Transporte Colegial</h1>
-            <p style={styles.subtitle}>
-              Gestión de solicitudes, rutas, buses y estados
-            </p>
+            <h1 style={styles.title}>Panel Administrativo</h1>
+            <p style={styles.subtitle}>Gestione las solicitudes de transporte escolar</p>
           </div>
-
           <button onClick={cargarSolicitudes} style={styles.reloadBtn}>
-            🔄 Recargar
+            Recargar
           </button>
-        </header>
+        </div>
 
-        <section style={styles.cards}>
-          <StatCard label="Total" value={resumen.total} />
-          <StatCard label="Pendiente" value={resumen.pendiente} />
-          <StatCard label="Preinscrito" value={resumen.preinscrito} />
-          <StatCard label="Aprobado" value={resumen.aprobado} />
-          <StatCard label="Activo" value={resumen.activo} />
-          <StatCard label="Rechazado" value={resumen.rechazado} />
-        </section>
-
-        <section style={styles.filters}>
+        <div style={styles.filters}>
           <input
             type="text"
-            placeholder="Buscar por estudiante, acudiente, teléfono, ruta o bus..."
-            value={buscando}
-            onChange={(e) => setBuscando(e.target.value)}
-            style={styles.searchInput}
+            placeholder="Buscar por estudiante, acudiente, cupo o email..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            style={styles.search}
           />
 
           <select
@@ -168,95 +100,72 @@ export default function AdminPanel() {
             onChange={(e) => setFiltroEstado(e.target.value)}
             style={styles.select}
           >
-            {ESTADOS.map((estado) => (
-              <option key={estado} value={estado}>
-                {estado.toUpperCase()}
-              </option>
-            ))}
+            <option value="todos">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="activo">Activo</option>
+            <option value="rechazado">Rechazado</option>
           </select>
-        </section>
+        </div>
 
-        {error && <div style={styles.errorBox}>⚠️ {error}</div>}
+        {loading && <div style={styles.infoBox}>Cargando solicitudes...</div>}
+        {error && <div style={styles.errorBox}>❌ {error}</div>}
 
-        <section style={styles.tableWrapper}>
-          {loading ? (
-            <div style={styles.loading}>Cargando solicitudes...</div>
-          ) : solicitudesFiltradas.length === 0 ? (
-            <div style={styles.empty}>No hay solicitudes para mostrar.</div>
-          ) : (
+        {!loading && !error && (
+          <>
+            <div style={styles.infoBox}>
+              Total: <strong>{filtradas.length}</strong> solicitud(es)
+            </div>
+
             <div style={styles.grid}>
-              {solicitudesFiltradas.map((item) => (
+              {filtradas.map((item) => (
                 <div key={item.id} style={styles.card}>
                   <div style={styles.cardTop}>
                     <div>
-                      <h3 style={styles.studentName}>
-                        {item.estudiante_nombre || "Sin nombre"}
-                      </h3>
-                      <p style={styles.gradeText}>
-                        Grado: {item.grado || "-"}
-                      </p>
+                      <div style={styles.cupo}>{item.numero_cupo || "Sin cupo"}</div>
+                      <div style={styles.estudiante}>{item.estudiante_nombre || "Sin nombre"}</div>
                     </div>
 
-                    <span
-                      style={{
-                        ...styles.badge,
-                        backgroundColor: colorEstado(item.estado),
-                      }}
-                    >
-                      {item.estado || "sin estado"}
+                    <span style={badgeStyle(item.estado)}>
+                      {String(item.estado || "pendiente").toUpperCase()}
                     </span>
                   </div>
 
-                  <div style={styles.infoGrid}>
-                    <Info label="Acudiente" value={item.acudiente_nombre} />
-                    <Info label="Teléfono" value={item.telefono} />
-                    <Info label="Email" value={item.email} />
-                    <Info label="Dirección" value={item.barriada + ", " + item.calle + ", " + item.casa + "."} />
-                    <Info label="Ruta" value={item.ruta_nombre} />
-                    <Info label="Bus asignado" value={item.bus_asignado} />
-                    <Info
-                      label="Precio anual"
-                      value={formatearDinero(item.precio_anual)}
-                    />
-                    <Info
-                      label="cuota_10_meses"
-                      value={formatearDinero(item.cuota_10_meses)}
-                    />
-                    <Info
-                      label="Fecha registro"
-                      value={formatearFecha(item.created_at)}
-                    />
+                  <div style={styles.cardGrid}>
+                    <Item label="Acudiente" value={item.acudiente_nombre} />
+                    <Item label="Teléfono" value={item.telefono} />
+                    <Item label="Email" value={item.email} />
+                    <Item label="Cédula" value={item.acudiente_cedula} />
+                    <Item label="Grado" value={item.estudiante_grado} />
+                    <Item label="Dirección" value={item.direccion} />
+                    <Item label="Ruta" value={item.ruta} />
+                    <Item label="Bus asignado" value={item.bus_asignado} />
+                    <Item label="Tipo servicio" value={item.tipo_servicio} />
+                    <Item label="Precio anual" value={`$${item.precio_anual ?? 0}`} />
+                    <Item label="Cuota mensual" value={`$${item.cuota_mensual ?? 0}`} />
                   </div>
 
                   <div style={styles.actions}>
                     <button
-                      onClick={() => cambiarEstado(item.id, "pendiente")}
                       disabled={actualizandoId === item.id}
-                      style={{ ...styles.actionBtn, background: "#f59e0b" }}
-                    >
-                      Pendiente
-                    </button>
-
-                    <button
-                      onClick={() => cambiarEstado(item.id, "aprobado")}
-                      disabled={actualizandoId === item.id}
-                      style={{ ...styles.actionBtn, background: "#10b981" }}
+                      onClick={() => actualizarEstado(item.id, "aprobado")}
+                      style={{ ...styles.btn, background: "#f59e0b" }}
                     >
                       Aprobar
                     </button>
 
                     <button
-                      onClick={() => cambiarEstado(item.id, "activo")}
                       disabled={actualizandoId === item.id}
-                      style={{ ...styles.actionBtn, background: "#059669" }}
+                      onClick={() => actualizarEstado(item.id, "activo")}
+                      style={{ ...styles.btn, background: "#16a34a" }}
                     >
                       Activar
                     </button>
 
                     <button
-                      onClick={() => cambiarEstado(item.id, "rechazado")}
                       disabled={actualizandoId === item.id}
-                      style={{ ...styles.actionBtn, background: "#ef4444" }}
+                      onClick={() => actualizarEstado(item.id, "rechazado")}
+                      style={{ ...styles.btn, background: "#dc2626" }}
                     >
                       Rechazar
                     </button>
@@ -264,210 +173,187 @@ export default function AdminPanel() {
                 </div>
               ))}
             </div>
-          )}
-        </section>
+
+            {filtradas.length === 0 && (
+              <div style={styles.infoBox}>No hay solicitudes con esos filtros.</div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value }) {
+function Item({ label, value }) {
   return (
-    <div style={styles.statCard}>
-      <div style={styles.statValue}>{value}</div>
-      <div style={styles.statLabel}>{label}</div>
+    <div style={styles.item}>
+      <div style={styles.itemLabel}>{label}</div>
+      <div style={styles.itemValue}>{value || "-"}</div>
     </div>
   );
 }
 
-function Info({ label, value }) {
-  return (
-    <div style={styles.infoItem}>
-      <span style={styles.infoLabel}>{label}:</span>
-      <span style={styles.infoValue}>{value || "-"}</span>
-    </div>
-  );
+function badgeStyle(estado) {
+  const e = String(estado || "").toLowerCase();
+
+  let bg = "#e2e8f0";
+  let color = "#334155";
+
+  if (e === "pendiente") {
+    bg = "#fef3c7";
+    color = "#92400e";
+  }
+  if (e === "aprobado") {
+    bg = "#dbeafe";
+    color = "#1d4ed8";
+  }
+  if (e === "activo") {
+    bg = "#dcfce7";
+    color = "#166534";
+  }
+  if (e === "rechazado") {
+    bg = "#fee2e2";
+    color = "#991b1b";
+  }
+
+  return {
+    background: bg,
+    color,
+    padding: "8px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800
+  };
 }
 
 const styles = {
   page: {
-    minHeight: "100vh",
-    background: "#f3f4f6",
-    padding: "20px",
-    fontFamily: "Arial, sans-serif",
+    padding: 18
   },
   container: {
-    maxWidth: "1400px",
-    margin: "0 auto",
+    maxWidth: 1300,
+    margin: "0 auto"
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
+    gap: 12,
     alignItems: "center",
-    gap: "12px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
+    marginBottom: 16,
+    flexWrap: "wrap"
   },
   title: {
     margin: 0,
-    fontSize: "28px",
-    color: "#111827",
+    color: "#0f172a"
   },
   subtitle: {
-    margin: "6px 0 0 0",
-    color: "#6b7280",
+    marginTop: 6,
+    color: "#475569"
   },
   reloadBtn: {
-    background: "#111827",
-    color: "white",
     border: "none",
-    borderRadius: "10px",
-    padding: "10px 16px",
+    background: "#2563eb",
+    color: "#fff",
+    padding: "10px 14px",
+    borderRadius: 12,
     cursor: "pointer",
-    fontWeight: "bold",
-  },
-  cards: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-    gap: "12px",
-    marginBottom: "20px",
-  },
-  statCard: {
-    background: "white",
-    borderRadius: "14px",
-    padding: "16px",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
-    textAlign: "center",
-  },
-  statValue: {
-    fontSize: "28px",
-    fontWeight: "bold",
-    color: "#111827",
-  },
-  statLabel: {
-    marginTop: "6px",
-    color: "#6b7280",
-    fontSize: "14px",
+    fontWeight: 700
   },
   filters: {
-    display: "flex",
-    gap: "12px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
+    display: "grid",
+    gridTemplateColumns: "2fr 1fr",
+    gap: 12,
+    marginBottom: 14
   },
-  searchInput: {
-    flex: 1,
-    minWidth: "280px",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    fontSize: "14px",
+  search: {
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    fontSize: 15
   },
   select: {
-    minWidth: "180px",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "1px solid #d1d5db",
-    fontSize: "14px",
-    background: "white",
+    padding: 12,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    fontSize: 15
+  },
+  infoBox: {
+    background: "#fff",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 14,
+    border: "1px solid #e2e8f0"
   },
   errorBox: {
-    background: "#fee2e2",
+    background: "#fef2f2",
     color: "#991b1b",
-    padding: "12px",
-    borderRadius: "10px",
-    marginBottom: "16px",
-    fontWeight: "bold",
-  },
-  tableWrapper: {
-    marginTop: "10px",
-  },
-  loading: {
-    background: "white",
-    padding: "30px",
-    borderRadius: "14px",
-    textAlign: "center",
-    color: "#6b7280",
-  },
-  empty: {
-    background: "white",
-    padding: "30px",
-    borderRadius: "14px",
-    textAlign: "center",
-    color: "#6b7280",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 14,
+    border: "1px solid #fecaca"
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
-    gap: "16px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+    gap: 14
   },
   card: {
-    background: "white",
-    borderRadius: "16px",
-    padding: "16px",
-    boxShadow: "0 6px 16px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
+    background: "#fff",
+    borderRadius: 18,
+    padding: 16,
+    boxShadow: "0 10px 24px rgba(15,23,42,.06)",
+    border: "1px solid #e2e8f0"
   },
   cardTop: {
     display: "flex",
     justifyContent: "space-between",
+    gap: 10,
     alignItems: "flex-start",
-    gap: "10px",
-    marginBottom: "14px",
+    marginBottom: 12
   },
-  studentName: {
-    margin: 0,
-    fontSize: "20px",
-    color: "#111827",
+  cupo: {
+    fontWeight: 900,
+    fontSize: 18,
+    color: "#1d4ed8"
   },
-  gradeText: {
-    margin: "6px 0 0 0",
-    color: "#6b7280",
-    fontSize: "14px",
+  estudiante: {
+    fontWeight: 800,
+    color: "#0f172a",
+    marginTop: 4
   },
-  badge: {
-    color: "white",
-    padding: "6px 10px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  infoGrid: {
+  cardGrid: {
     display: "grid",
-    gap: "8px",
-    marginBottom: "16px",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10
   },
-  infoItem: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-    background: "#f9fafb",
-    borderRadius: "10px",
-    padding: "10px",
+  item: {
+    background: "#f8fafc",
+    borderRadius: 12,
+    padding: 10
   },
-  infoLabel: {
-    fontSize: "12px",
-    color: "#6b7280",
-    fontWeight: "bold",
+  itemLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#64748b"
   },
-  infoValue: {
-    fontSize: "14px",
-    color: "#111827",
-    wordBreak: "break-word",
+  itemValue: {
+    marginTop: 4,
+    fontWeight: 700,
+    color: "#0f172a",
+    wordBreak: "break-word"
   },
   actions: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, 1fr)",
-    gap: "8px",
+    display: "flex",
+    gap: 8,
+    marginTop: 14,
+    flexWrap: "wrap"
   },
-  actionBtn: {
-    color: "white",
+  btn: {
     border: "none",
-    borderRadius: "10px",
-    padding: "10px",
+    color: "#fff",
+    padding: "10px 12px",
+    borderRadius: 10,
     cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "13px",
-  },
+    fontWeight: 800
+  }
 };
