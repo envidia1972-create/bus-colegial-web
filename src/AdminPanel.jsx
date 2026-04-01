@@ -9,9 +9,9 @@ export default function AdminPanel() {
     setLoading(true);
 
     const { data, error } = await supabase
-      .from("solicitudes_bus")
-      .select("*")
-      .order("fecha_solicitud", { ascending: false, nullsFirst: false });
+  .from("solicitudes_bus")
+  .select("*")
+  .order("id", { ascending: false });
 
     if (error) {
       console.error(error);
