@@ -1,66 +1,42 @@
 import { useState } from "react";
+import AdminPanel from "./AdminPanel";
 
-export default function AdminGate({ children }) {
-  const [ok, setOk] = useState(sessionStorage.getItem("admin_ok") === "1");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+export default function AdminGate() {
+  const [clave, setClave] = useState("");
+  const [ok, setOk] = useState(false);
 
-  const ADMIN_PASSWORD = "1234"; // 👈 cámbiala luego
+  const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "1234";
 
-  const handleLogin = (e) => {
+  const entrar = (e) => {
     e.preventDefault();
-
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem("admin_ok", "1");
+    if (clave === ADMIN_PASSWORD) {
       setOk(true);
-      setError("");
     } else {
-      setError("Contraseña incorrecta");
+      alert("Clave incorrecta");
     }
   };
 
-  const logout = () => {
-    sessionStorage.removeItem("admin_ok");
-    setOk(false);
-    setPassword("");
-  };
-
-  if (!ok) {
-    return (
-      <div style={styles.wrap}>
-        <div style={styles.card}>
-          <h2 style={styles.title}>Acceso Administrador</h2>
-          <p style={styles.subtitle}>Ingrese la contraseña para acceder al panel</p>
-
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              placeholder="Contraseña"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-            />
-
-            {error && <p style={{ color: "#dc2626", marginTop: 8 }}>{error}</p>}
-
-            <button type="submit" style={styles.button}>
-              Entrar
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  if (ok) return <AdminPanel />;
 
   return (
-    <div>
-      <div style={styles.topbar}>
-        <span style={{ fontWeight: 700 }}>Panel Admin</span>
-        <button onClick={logout} style={styles.logoutBtn}>
-          Cerrar sesión
-        </button>
+    <div style={styles.wrap}>
+      <div style={styles.card}>
+        <h2>Panel Administrativo</h2>
+        <p>Ingrese la clave para continuar</p>
+
+        <form onSubmit={entrar}>
+          <input
+            type="password"
+            placeholder="Clave de administrador"
+            value={clave}
+            onChange={(e) => setClave(e.target.value)}
+            style={styles.input}
+          />
+          <button type="submit" style={styles.button}>
+            Entrar
+          </button>
+        </form>
       </div>
-      {children}
     </div>
   );
 }
@@ -71,60 +47,33 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20
+    background: "#f3f4f6",
+    padding: 20,
   },
   card: {
+    background: "#fff",
+    padding: 24,
+    borderRadius: 16,
     width: "100%",
     maxWidth: 420,
-    background: "#fff",
-    borderRadius: 18,
-    padding: 24,
-    boxShadow: "0 10px 30px rgba(0,0,0,.08)"
-  },
-  title: {
-    margin: 0,
-    color: "#0f172a"
-  },
-  subtitle: {
-    color: "#475569",
-    marginTop: 8,
-    marginBottom: 16
+    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
   },
   input: {
     width: "100%",
     padding: 12,
-    borderRadius: 12,
-    border: "1px solid #cbd5e1",
-    outline: "none",
-    fontSize: 16,
-    boxSizing: "border-box"
+    borderRadius: 10,
+    border: "1px solid #ccc",
+    marginTop: 10,
+    marginBottom: 14,
   },
   button: {
     width: "100%",
-    marginTop: 14,
     padding: 12,
-    border: "none",
-    borderRadius: 12,
-    background: "#2563eb",
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer"
-  },
-  topbar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "14px 18px",
-    background: "#0f172a",
-    color: "#fff"
-  },
-  logoutBtn: {
-    border: "none",
-    background: "#ef4444",
-    color: "#fff",
     borderRadius: 10,
-    padding: "8px 12px",
+    border: "none",
+    background: "#111827",
+    color: "#fff",
+    fontWeight: "bold",
     cursor: "pointer",
-    fontWeight: 700
-  }
+  },
 };
