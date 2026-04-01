@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
@@ -13,23 +11,32 @@ export default async function handler(req, res) {
       estudiante_nombre,
       acudiente_nombre,
       telefono,
-      email,
+      correo_estudiante,
       ruta,
       bus_asignado,
       tipo_servicio,
       precio_anual,
       cuota_mensual,
+      nota_adicional,
     } = req.body;
 
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL;
+    const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
-    if (!adminEmail) {
-      return res.status(500).json({ error: "ADMIN_NOTIFY_EMAIL no configurado" });
+    if (!RESEND_API_KEY) {
+      return res.status(500).json({ error: "Falta RESEND_API_KEY en Vercel" });
     }
 
+    if (!ADMIN_NOTIFY_EMAIL) {
+      return res.status(500).json({ error: "Falta ADMIN_NOTIFY_EMAIL en Vercel" });
+    }
+
+    const resend = new Resend(RESEND_API_KEY);
+
     const data = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
-      to: adminEmail,
+      from: RESEND_FROM_EMAIL,
+      to: ADMIN_NOTIFY_EMAIL,
       subject: `Nueva solicitud de transporte - ${numero_cupo}`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -38,19 +45,26 @@ export default async function handler(req, res) {
           <p><strong>Estudiante:</strong> ${estudiante_nombre}</p>
           <p><strong>Acudiente:</strong> ${acudiente_nombre}</p>
           <p><strong>Teléfono:</strong> ${telefono}</p>
-          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Correo estudiante:</strong> ${correo_estudiante}</p>
           <p><strong>Ruta:</strong> ${ruta}</p>
           <p><strong>Bus asignado:</strong> ${bus_asignado}</p>
           <p><strong>Tipo de servicio:</strong> ${tipo_servicio}</p>
-          <p><strong>Precio anual:</strong> $${Number(precio_anual).toFixed(2)}</p>
-          <p><strong>10 cuotas:</strong> $${Number(cuota_mensual).toFixed(2)}</p>
+          <p><strong>Precio anual:</strong> $${Number(precio_anual || 0).toFixed(2)}</p>
+          <p><strong>10 cuotas:</strong> $${Number(cuota_mensual || 0).toFixed(2)}</p>
+          <p><strong>Nota adicional:</strong> ${nota_adicional || "Sin nota"}</p>
         </div>
       `,
     });
 
-    return res.status(200).json({ ok: true, data });
+    return res.status(200).json({
+      ok: true,
+      message: "Correo enviado correctamente",
+      data,
+    });
   } catch (error) {
-    console.error("Error notificar-admin:", error);
-    return res.status(500).json({ error: error.message || "Error enviando correo" });
+    return res.status(500).json({
+      error: error?.message || "Error enviando correo",
+      details: error?.name || "Error desconocido",
+    });
   }
 }
