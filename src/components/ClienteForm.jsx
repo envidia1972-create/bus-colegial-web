@@ -101,7 +101,7 @@ export default function ClienteForm() {
       };
 
       const { error } = await supabase
-        .from("solicitudes_transporte")
+        .from("solicitudes_bus")
         .insert([payload]);
 
       if (error) throw error;

@@ -13,7 +13,7 @@ export default function AdminPanel() {
     setErrorMsg("");
 
     const { data, error } = await supabase
-      .from("solicitudes_transporte")
+      .from("solicitudes_")	bus
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -38,7 +38,7 @@ export default function AdminPanel() {
     }
 
     const { error } = await supabase
-      .from("solicitudes_transporte")
+      .from("solicitudes_bus")
       .update({ estado: nuevoEstado })
       .eq("id", id);
 
