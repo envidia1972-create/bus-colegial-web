@@ -40,15 +40,13 @@ export default function ClienteForm() {
   const [mensaje, setMensaje] = useState("");
 
   const busesDisponibles = form.ruta ? rutasConfig[form.ruta]?.buses || [] : [];
-
   const busSeleccionado = busesDisponibles.find((b) => b.nombre === form.bus_asignado);
 
-  const precio_anual =
-    busSeleccionado
-      ? form.tipo_servicio === "completo"
-        ? busSeleccionado.precioCompleto
-        : busSeleccionado.precioMedio
-      : 0;
+  const precio_anual = busSeleccionado
+    ? form.tipo_servicio === "completo"
+      ? busSeleccionado.precioCompleto
+      : busSeleccionado.precioMedio
+    : 0;
 
   const cuota_mensual = precio_anual / 10;
 
@@ -70,9 +68,7 @@ export default function ClienteForm() {
     }));
   };
 
-  const generarNumeroCupo = () => {
-    return `CUP-${Date.now()}`;
-  };
+  const generarNumeroCupo = () => `CUP-${Date.now()}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,7 +97,7 @@ export default function ClienteForm() {
       };
 
       const { error } = await supabase
-        .from("solicitudes_bus")
+        .from("solicitudes_transporte")
         .insert([payload]);
 
       if (error) throw error;
@@ -109,17 +105,12 @@ export default function ClienteForm() {
       try {
         const resp = await fetch("/api/notificar-admin", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
 
         const mailResult = await resp.json();
-
-        if (!resp.ok) {
-          console.warn("Falló correo admin:", mailResult);
-        }
+        if (!resp.ok) console.warn("Falló correo admin:", mailResult);
       } catch (mailError) {
         console.warn("No se pudo notificar al admin:", mailError);
       }
@@ -285,7 +276,7 @@ export default function ClienteForm() {
 
 const styles = {
   card: {
-    maxWidth: "700px",
+    maxWidth: "720px",
     margin: "30px auto",
     padding: "24px",
     borderRadius: "14px",

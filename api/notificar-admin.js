@@ -47,7 +47,7 @@ export default async function handler(req, res) {
           <p><strong>Teléfono:</strong> ${telefono}</p>
           <p><strong>Correo estudiante:</strong> ${correo_estudiante}</p>
           <p><strong>Ruta:</strong> ${ruta}</p>
-          <p><strong>Bus asignado:</strong> ${bus_asignado}</p>
+          <p><strong>Bus escogido:</strong> ${bus_asignado}</p>
           <p><strong>Tipo de servicio:</strong> ${tipo_servicio}</p>
           <p><strong>Precio anual:</strong> $${Number(precio_anual || 0).toFixed(2)}</p>
           <p><strong>10 cuotas:</strong> $${Number(cuota_mensual || 0).toFixed(2)}</p>
@@ -58,12 +58,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      message: "Correo enviado correctamente",
+      message: "Correo admin enviado",
       data,
     });
   } catch (error) {
     return res.status(500).json({
-      error: error?.message || "Error enviando correo",
+      error: error?.message || "Error enviando correo admin",
       details: error?.name || "Error desconocido",
     });
   }
