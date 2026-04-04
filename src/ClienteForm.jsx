@@ -30,6 +30,7 @@ export default function ClienteForm() {
     grado: "",
     direccion: "",
     ruta_id: "",
+    nota_adicional: "",
     tipo_servicio: "Completo"
   });
 
@@ -101,6 +102,7 @@ export default function ClienteForm() {
         telefono: form.telefono,
         email: form.email,
         estudiante_nombre: form.estudiante_nombre,
+        nota_adicional: form.nota_adicional,
         grado: form.grado,
         direccion: form.direccion,
 
@@ -137,6 +139,7 @@ export default function ClienteForm() {
         estudiante_nombre: "",
         grado: "",
         direccion: "",
+        nota_adicional: "",
         ruta_id: "",
         tipo_servicio: "Completo"
       });
@@ -251,6 +254,15 @@ export default function ClienteForm() {
             ))}
           </select>
 
+         <Input
+            label="Nota adicional"
+            name="nota_adicional"
+            placeholder="detalles adicionales de la direccion, numero de bus si ya viaja, ect."
+            value={form.nota_adicional}
+            onChange={onChange}
+            required
+          />
+
           {rutaSeleccionada && (
             <div style={styles.resumen}>
               <h3 style={{ marginTop: 0, color: "#0f172a" }}>Resumen de asignación</h3>
@@ -264,11 +276,11 @@ export default function ClienteForm() {
               </div>
 
               {(form.tipo_servicio === "Solo recoger en casa" ||
-                form.tipo_servicio === "Solo llevar a casa") && (
-                <p style={{ color: "#166534", marginTop: 12, fontWeight: 600 }}>
-                  ✅ Se aplicó descuento de $100 por servicio parcial
-                </p>
-              )}
+              form.tipo_servicio === "Solo llevar a casa") && (
+              <p style={{ color: "#166534", marginTop: 12, fontWeight: 600 }}>
+                ✅ Se aplicó descuento de $100 por servicio parcial
+             </p>
+             )}
             </div>
           )}
 

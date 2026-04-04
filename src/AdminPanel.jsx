@@ -140,6 +140,7 @@ export default function AdminPanel() {
                     <Item label="Dirección" value={item.direccion} />
                     <Item label="Ruta" value={item.ruta_id} />
                     <Item label="Bus asignado" value={item.bus_asignado} />
+                    <Item label="Nota adicional" value={item.nota_adicional} />
                     <Item label="Tipo servicio" value={item.tipo_servicio} />
                     <Item label="Precio anual" value={`$${item.precio_anual ?? 0}`} />
                     <Item label="Cuota mensual" value={`$${item.cuota_mensual ?? 0}`} />
