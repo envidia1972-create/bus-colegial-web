@@ -152,9 +152,23 @@ export default function ClienteForm() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.card}>
+      <div style={{ ...styles.card, position: "relative"}}>
+
+<img
+  src="/logo.png"
+  alt="Logo Transporte"
+  style={{
+    position: "absolute",
+    top: "18px",
+    right: "18px",
+    width: "65px",
+    height: "65px",
+    objectFit: "contain"
+  }}
+/>
+
         <div style={styles.header}>
-          <h1 style={styles.title}>Contratación de Transporte Colegial</h1>
+          <h1 style={styles.title}>Contratación de Transporte Colegial del IESC</h1>
           <p style={styles.subtitle}>
             Complete el formulario para solicitar su cupo de transporte escolar
           </p>
